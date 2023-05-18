@@ -6,6 +6,9 @@ export class MemoriesController {
   static async findMemories(request: FastifyRequest, reply: FastifyReply) {
     try {
       const memories = await client.memory.findMany({
+        where: {
+          userId: request.user.sub
+        },
         orderBy: {
           createdAt: 'asc'
         }
@@ -37,6 +40,10 @@ export class MemoriesController {
         }
       })
 
+      if (!memory.isPublic && memory.userId !== request.user.sub) {
+        return reply.status(401).send('Unauthorized!')
+      }
+
       return reply.status(200).send(memory)
     } catch (err) {
       return reply.status(400).send('Unexpected Error')
@@ -58,7 +65,7 @@ export class MemoriesController {
           content,
           coverUrl,
           isPublic,
-          userId: '1fad6c54-d8af-47c1-ae58-78f97f35adf1'
+          userId: request.user.sub
         }
       })
 
@@ -84,7 +91,17 @@ export class MemoriesController {
 
       const { content, isPublic, coverUrl } = bodySchema.parse(request.body)
 
-      const modified_memory = await client.memory.update({
+      let memory = await client.memory.findUniqueOrThrow({
+        where: {
+          id
+        }
+      })
+
+      if (memory.userId !== request.user.sub) {
+        return reply.status(401).send('Unauthorized!')
+      }
+
+      memory = await client.memory.update({
         where: {
           id
         },
@@ -95,7 +112,7 @@ export class MemoriesController {
         }
       })
 
-      return reply.status(200).send(modified_memory)
+      return reply.status(200).send(memory)
     } catch (err) {
       return reply.status(400).send('Unexpected Error')
     }
@@ -108,6 +125,16 @@ export class MemoriesController {
       })
 
       const { id } = paramsSchema.parse(request.params)
+
+      const memory = await client.memory.findUniqueOrThrow({
+        where: {
+          id
+        }
+      })
+
+      if (memory.userId !== request.user.sub) {
+        return reply.status(401).send('Unauthorized!')
+      }
 
       await client.memory.delete({
         where: {
